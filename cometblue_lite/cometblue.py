@@ -20,10 +20,10 @@ TEMPERATURE_CHAR = "47e9ee2b-47e9-11e4-8939-164230d1df67"
 BATTERY_CHAR = "47e9ee2c-47e9-11e4-8939-164230d1df67"
 STATUS_CHAR = "47e9ee2a-47e9-11e4-8939-164230d1df67"
 DATETIME_CHAR = "47e9ee01-47e9-11e4-8939-164230d1df67"
-SOFTWARE_REV = "00002a28-0000-1000-8000-00805f9b34fb"       # software_revision (0.0.6-sygonix1)
-MODEL_CHAR = "00002a24-0000-1000-8000-00805f9b34fb"         # model_number (Comet Blue)
+SOFTWARE_REV = "00002a28-0000-1000-8000-00805f9b34fb"  # software_revision (0.0.6-sygonix1)
+MODEL_CHAR = "00002a24-0000-1000-8000-00805f9b34fb"  # model_number (Comet Blue)
 MANUFACTURER_CHAR = "00002a29-0000-1000-8000-00805f9b34fb"  # manufacturer_name (EUROtronic GmbH)
-FIRMWARE_CHAR = "47e9ee2d-47e9-11e4-8939-164230d1df67"      # firmware_revision2 (COBL0126)
+FIRMWARE_CHAR = "47e9ee2d-47e9-11e4-8939-164230d1df67"  # firmware_revision2 (COBL0126)
 _PIN_STRUCT_PACKING = '<I'
 _DATETIME_STRUCT_PACKING = '<BBBBB'
 _DAY_STRUCT_PACKING = '<BBBBBBBB'
@@ -43,7 +43,7 @@ def _encode_datetime(dt):
 
 class CometBlueStates:
     """CometBlue Thermostat States"""
-    TEMPERATURE_OFF = 7.5   # special temperature, valve fully closed
+    TEMPERATURE_OFF = 7.5  # special temperature, valve fully closed
     _TEMPERATURES_STRUCT_PACKING = '<bbbbbbb'
     _STATUS_STRUCT_PACKING = '<BBB'
 
@@ -233,10 +233,10 @@ class CometBlueStates:
     @property
     def all_temperatures_none(self):
         """True if any of the temperature properties is not None"""
-        values = set((self.target_temperature, self.target_temp_l, self.target_temp_h, self.offset_temperature, self.window_open_detection, self.window_open_minutes))
+        values = {self.target_temperature, self.target_temp_l, self.target_temp_h, self.offset_temperature, self.window_open_detection,
+                  self.window_open_minutes}
         values.remove(None)
         return len(values) == 0
-
 
 
 class CometBlue:
@@ -276,7 +276,7 @@ class CometBlue:
         except BrokenPipeError as ex:
             _LOGGER.debug("Device %s BrokenPipeError: %s", self._address, ex)
             self.available = False
-            raise btle.BTLEDisconnectError() from ex
+            raise btle.BTLEDisconnectError(f"Device {self._address} connection broken") from ex
         finally:
             self._disconnect(conn)
 
@@ -295,14 +295,13 @@ class CometBlue:
                 _LOGGER.debug("Connecting to device %s failed:\n%s", self._address, ex)
                 raise
 
-        if len(self._handles) == 0:
-            _LOGGER.debug("Discovering characteristics for device %s", self._address)
-            try:
-                chars = conn.getCharacteristics()
-                self._handles = {str(a.uuid): a.getHandle() for a in chars}
-            except btle.BTLEException as ex:
-                _LOGGER.debug("Couldn't discover characteristics: %s", ex)
-                raise
+        _LOGGER.debug("Discovering characteristics for device %s", self._address)
+        try:
+            chars = conn.getCharacteristics()
+            self._handles = {str(a.uuid): a.getHandle() for a in chars}
+        except btle.BTLEException as ex:
+            _LOGGER.debug("Couldn't discover characteristics: %s", ex)
+            raise
 
         # authenticate with PIN and initialize static values
         try:
@@ -319,9 +318,9 @@ class CometBlue:
         """Disconnect from thermostat"""
         try:
             connection.disconnect()
+            self._handles = {}
         except (btle.BTLEException, BrokenPipeError) as ex:
-            _LOGGER.debug("Couldn't disconnect from device %s:\n%s", self._address, ex)
-            raise btle.BTLEDisconnectError() from ex
+            raise btle.BTLEDisconnectError(f"Couldn't disconnect from device {self._address}") from ex
         else:
             _LOGGER.debug("Disconnected from device %s", self._address)
 
